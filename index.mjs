@@ -30,9 +30,10 @@ async function fetchUser(token,env){
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
  let r;
  try{
-  r=await fetch(project+'/auth/v1/user',{headers:{apikey:pub,Authorization:'Bearer '+token,'Accept':'application/json'},signal:controller.signal,redirect:'error',cache:'no-store'});
+  r=await fetch(project+'/auth/v1/user',{headers:{apikey:pub,Authorization:'Bearer '+token,'Accept':'application/json'},signal:controller.signal,redirect:'manual',cache:'no-store'});
  }catch(e){throw upstreamError(e?.name==='AbortError'?'AI_SUPABASE_TIMEOUT':'AI_SUPABASE_NETWORK');}
  finally{clearTimeout(timer)}
+ if(r.status>=300&&r.status<400)throw upstreamError('AI_SUPABASE_REDIRECT',r.status); // Never forward the bearer token to a redirect target.
  if(r.status===401||r.status===403)return null; // Invalid login is NOT a server outage.
  if(!r.ok)throw upstreamError('AI_SUPABASE_UPSTREAM',r.status);
  let user;
@@ -53,7 +54,7 @@ export default {async fetch(request,env){
  if(path==='/health'&&request.method==='GET'){
   let supabaseReady=false;try{supabaseConfig(env);supabaseReady=true}catch{}
   const checks={aiBinding:Boolean(env.AI),rateLimit:Boolean(env.AI_RATE_LIMIT),supabasePublicConfig:supabaseReady,allowedOrigin:Boolean(permitted)};
-  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.2'});
+  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.3'});
  }
  if(path!=='/assist')return json({error:'Tidak ditemukan.'},404,cors);
  if(!permitted||!cors)return json({error:'Origin tidak diizinkan.'},403);
@@ -72,6 +73,7 @@ export default {async fetch(request,env){
  try{user=await fetchUser(bearer[1],env)}catch(err){
   const code=String(err?.code||'AI_SUPABASE_NETWORK');
   if(code==='AI_SUPABASE_CONFIG')return json({error:'Konfigurasi Supabase pada Worker AI tidak valid. Periksa pengaturan Worker.',code},503,cors);
+  if(code==='AI_SUPABASE_REDIRECT')return json({error:'Alamat Supabase di Worker mengalihkan permintaan. Periksa URL proyek Supabase.',code},503,cors);
   if(code==='AI_SUPABASE_TIMEOUT')return json({error:'Supabase tidak merespons dalam batas waktu. Ulangi saat koneksi stabil.',code},503,cors);
   if(code==='AI_SUPABASE_UPSTREAM')return json({error:'Layanan autentikasi Supabase sedang mengembalikan kesalahan. Coba lagi.',code},503,cors);
   if(code==='AI_SUPABASE_RESPONSE')return json({error:'Respons autentikasi Supabase tidak dikenali. Periksa konfigurasi Worker.',code},502,cors);

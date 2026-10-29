@@ -1,0 +1,4 @@
+SIPETAK v3.8.3 — HOTFIX Cloudflare Worker AI
+Ganti hanya index.mjs pada repository GitHub sipetak-asisten-ai.
+Perbaikan: redirect error -> manual, blok pengalihan 3xx, health version 3.8.3.
+Tidak perlu mengganti app.js, ai-assistant.js, index.html, secret, atau SQL.
