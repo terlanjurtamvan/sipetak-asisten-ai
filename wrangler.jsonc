@@ -1,0 +1,13 @@
+{
+  "name": "sipetak-asisten-ai",
+  "main": "index.mjs",
+  "compatibility_date": "2026-10-29",
+  "workers_dev": true,
+  "ai": {"binding": "AI"},
+  "ratelimits": [{"name":"AI_RATE_LIMIT","namespace_id":"2038","simple":{"limit":4,"period":60}}],
+  "vars": {
+    "ALLOWED_ORIGIN": "https://sipetak.pages.dev",
+    "SUPABASE_URL": "https://cnaveitgtodqtahzsnqf.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_efG2vuqp1UEcz6vrtArPpQ_rAdnJFAk"
+  }
+}
