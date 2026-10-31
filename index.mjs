@@ -154,15 +154,32 @@ function checkSkpFollowup(sections,sourceText){
  return {ok:true};
 }
 function checkDimServiceTerms(sections,sourceText){
- // SPM adalah istilah regulatif spesifik, bukan sinonim otomatis standar pelayanan.
- // Izinkan pembedaan eksplisit; jangan otomatis menyisipkan acuan/nomor hukumnya.
- if(/\b(?:standar pelayanan minimal|SPM)\b/i.test(sourceText))return {ok:true};
- const text=[...sections.values()].flat().join(' ');
- if(!/\b(?:standar pelayanan minimal|SPM)\b/i.test(text))return {ok:true};
- const sentences=text.split(/[.\n;]/);
- for(const sentence of sentences){
-  if(/\b(?:standar pelayanan minimal|SPM)\b/i.test(sentence)&&! /\b(?:bukan|berbeda|tidak\s+sama|jangan\s+disamakan|perlu\s+dibedakan)\b/i.test(sentence))
-   return {ok:false,code:'AI_DIM_SPM_CONFUSION'};
+ // Tahap 4.1.1: istilah SPM boleh MUNCUL dalam analisis hukum yang benar.
+ // Yang ditolak ialah SPM dipersamakan atau diwajibkan sebagai standar untuk
+ // pelayanan administrasi umum. Pemeriksaan pola bukan verifikasi hukum.
+ const spm=/\b(?:standar\s+pelayanan\s+minimal|SPM)\b/i;
+ const sourceHasSpm=spm.test(sourceText);
+ const differentiates=/\b(?:bukan|berbeda(?:\s+dengan)?|tidak\s+(?:sama|identik|otomatis|tepat|dapat\s+disamakan)|jangan\s+disamakan|perlu\s+dibedakan|tidak\s+serta[ -]merta|khusus\s+(?:untuk|bagi)\s+pelayanan\s+dasar|hanya\s+(?:untuk|bagi|pada)\s+pelayanan\s+dasar|berlaku\s+(?:untuk|bagi|pada)\s+pelayanan\s+dasar)\b/i;
+ const conflates=[
+  /\b(?:standar\s+pelayanan(?:\s+(?:publik|umum|administrasi))?|pelayanan\s+(?:administrasi|publik|umum))\b.{0,100}?\b(?:adalah|merupakan|sama\s+dengan|setara\s+dengan|identik\s+dengan|yakni|yaitu)\s+(?:standar\s+pelayanan\s+minimal|SPM)\b/i,
+  /\b(?:standar\s+pelayanan\s+minimal|SPM)\b.{0,90}?\b(?:adalah|merupakan|sama\s+dengan|setara\s+dengan|identik\s+dengan|yakni|yaitu)\s+standar\s+pelayanan(?:\s+(?:publik|administrasi|umum))?\b/i,
+  /\b(?:pelayanan\s+(?:administrasi|publik|umum)|layanan\s+administrasi)\b.{0,100}?\b(?:wajib|harus|perlu|menerapkan|menggunakan|memenuhi|mengacu\s+pada|sesuai\s+dengan|berdasarkan)\b.{0,100}?\b(?:standar\s+pelayanan\s+minimal|SPM)\b/i,
+  /\b(?:standar\s+pelayanan\s+minimal|SPM)\b.{0,80}?\b(?:untuk|bagi|diterapkan\s+(?:pada|untuk)|menjadi\s+acuan)\b.{0,80}?\b(?:pelayanan\s+(?:administrasi|publik|umum)|layanan\s+administrasi)\b/i
+ ];
+ // Periksa per baris/kalimat: keterangan benar di bagian lain tidak otomatis
+ // melegalkan usulan normatif yang salah.
+ for(const [heading,lines] of sections){
+  for(const line of lines){
+   for(const sentence of String(line).split(/[.;]/)){
+    if(!spm.test(sentence))continue;
+    if(differentiates.test(sentence))continue;
+    if(conflates.some(pattern=>pattern.test(sentence)))return {ok:false,code:'AI_DIM_SPM_CONFUSION'};
+    // Jika input tidak menyebut SPM, draf tidak boleh menciptakan istilah itu
+    // sebagai rumusan perubahan atau rekomendasi normatif yang tak dibedakan.
+    if(!sourceHasSpm&&(heading==='ALTERNATIF REDAKSI'||heading==='RUMUSAN DALAM MATERI'))
+     return {ok:false,code:'AI_DIM_SPM_CONFUSION'};
+   }
+  }
  }
  return {ok:true};
 }
@@ -210,7 +227,7 @@ export default {async fetch(request,env){
   let supabaseReady=false;try{supabaseConfig(env);supabaseReady=true}catch{}
   const checks={aiBinding:Boolean(env.AI),rateLimit:Boolean(env.AI_RATE_LIMIT),supabasePublicConfig:supabaseReady,allowedOrigin:Boolean(permitted)};
   // Membolehkan frontend SIPETAK membaca /health; tanpa bearer, teks pekerjaan, atau data akun.
-  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.9-ai-multimode-refinement'},200,cors);
+  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.10-ai-dim-spm-fix'},200,cors);
  }
  if(path!=='/assist')return json({error:'Tidak ditemukan.'},404,cors);
  if(!permitted||!cors)return json({error:'Origin tidak diizinkan.'},403);
@@ -264,7 +281,7 @@ Ringkas namun utuh (sekitar 350–600 kata jika data memadai). Jangan mengarang 
 - STATUS INFORMASI: nyatakan simulasi/klaim, dan bahwa teks belum diverifikasi pada naskah Raperda resmi.
 - RUMUSAN DALAM MATERI: buat TABEL MARKDOWN ringkas 5 kolom dengan header PERSIS '| Rumusan awal | Usulan perubahan | Isu/analisis | Rekomendasi | Status |', lalu baris '| --- | --- | --- | --- | --- |' dan minimal satu baris data '| ... | ... | ... | ... | ... |'. Hanya rumusan yang benar-benar ada dalam materi boleh dikutip sebagai rumusan sumber; jika tidak ada, isi 'Belum tersedia dalam materi' dan tandai usulan hanya sebagai konsep. Kolom Status tidak boleh mengklaim 'disetujui/disahkan' jika materi tidak memuatnya.
 - ISU DAN ANALISIS: jelaskan potensi masalah redaksional, tujuan kebijakan dan akibat, bedakan asumsi dengan fakta sumber.
-- ALTERNATIF REDAKSI: usulan bersyarat, jelas ditandai sebagai contoh, bukan kutipan dari pasal resmi; jangan buat nomor pasal baru. Jika membahas layanan administrasi umum gunakan istilah 'standar pelayanan'. Jangan mengganti dengan 'standar pelayanan minimal (SPM)': SPM khusus Pelayanan Dasar, tidak otomatis sama dengan standar pelayanan publik. Jika materi memakai SPM, jelaskan perbedaannya dan beri tanda perlu verifikasi.
+- ALTERNATIF REDAKSI: usulan bersyarat, jelas ditandai sebagai contoh, bukan kutipan dari pasal resmi; jangan buat nomor pasal baru. Jika membahas layanan administrasi umum gunakan istilah 'standar pelayanan'. Jika materi TIDAK menyebut Standar Pelayanan Minimal (SPM), jangan menambahkan istilah SPM di draf, termasuk tabel, usulan redaksi, analisis, ataupun dasar hukum; cukup gunakan 'standar pelayanan'. Jika materi secara eksplisit membahas SPM, jelaskan bahwa SPM terkait Pelayanan Dasar, tidak otomatis sama dengan standar pelayanan administrasi umum, dan beri tanda perlu verifikasi. Jangan menggunakan SPM sebagai sinonim standar pelayanan.
 - DASAR HUKUM: wajib [PERLU VERIFIKASI], jangan mengarang nomor/tahun/jenis hukum, dan jangan menyatakan keberlakuan otomatis. Aturan nasional utama berjudul Sistem Pemerintahan Berbasis Elektronik (SPBE) berbentuk Peraturan Presiden, BUKAN Peraturan Pemerintah; jangan menyisipkan nomor/tahun yang tidak disertakan dalam materi.
 - HAL YANG PERLU DIVERIFIKASI: naskah resmi, kewenangan, harmonisasi, hierarki peraturan, dan kajian hukum pejabat berwenang.`,
   skp:`KHUSUS SKP/RHK:
