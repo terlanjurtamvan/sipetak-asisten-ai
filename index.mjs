@@ -227,7 +227,7 @@ export default {async fetch(request,env){
   let supabaseReady=false;try{supabaseConfig(env);supabaseReady=true}catch{}
   const checks={aiBinding:Boolean(env.AI),rateLimit:Boolean(env.AI_RATE_LIMIT),supabasePublicConfig:supabaseReady,allowedOrigin:Boolean(permitted)};
   // Membolehkan frontend SIPETAK membaca /health; tanpa bearer, teks pekerjaan, atau data akun.
-  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.10-ai-dim-spm-fix'},200,cors);
+  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.11-production'},200,cors);
  }
  if(path!=='/assist')return json({error:'Tidak ditemukan.'},404,cors);
  if(!permitted||!cors)return json({error:'Origin tidak diizinkan.'},403);
@@ -279,13 +279,13 @@ Ringkas namun utuh (sekitar 350–600 kata jika data memadai). Jangan mengarang 
   dim:`KHUSUS DIM/RAPERDA:
 - Ikuti delapan judul persis dalam instruksi mode; ini analisis konseptual, bukan DIM final atau pendapat hukum definitif.
 - STATUS INFORMASI: nyatakan simulasi/klaim, dan bahwa teks belum diverifikasi pada naskah Raperda resmi.
-- RUMUSAN DALAM MATERI: buat TABEL MARKDOWN ringkas 5 kolom dengan header PERSIS '| Rumusan awal | Usulan perubahan | Isu/analisis | Rekomendasi | Status |', lalu baris '| --- | --- | --- | --- | --- |' dan minimal satu baris data '| ... | ... | ... | ... | ... |'. Hanya rumusan yang benar-benar ada dalam materi boleh dikutip sebagai rumusan sumber; jika tidak ada, isi 'Belum tersedia dalam materi' dan tandai usulan hanya sebagai konsep. Kolom Status tidak boleh mengklaim 'disetujui/disahkan' jika materi tidak memuatnya.
-- ISU DAN ANALISIS: jelaskan potensi masalah redaksional, tujuan kebijakan dan akibat, bedakan asumsi dengan fakta sumber.
+- RUMUSAN DALAM MATERI: buat TABEL MARKDOWN ringkas 5 kolom dengan header PERSIS '| Rumusan awal | Usulan perubahan | Isu/analisis | Rekomendasi | Status |', lalu baris '| --- | --- | --- | --- | --- |' dan minimal satu baris data '| ... | ... | ... | ... | ... |'. Hanya rumusan yang benar-benar ada dalam materi boleh dikutip sebagai rumusan sumber; jika tidak ada, isi 'Belum tersedia dalam materi' dan tandai usulan hanya sebagai konsep. Kolom Status harus setia pada informasi keputusan dalam materi: jika dinyatakan belum ada keputusan persetujuan, tulis 'Belum ada keputusan persetujuan dalam materi'. Jangan menulis 'disetujui/disahkan' tanpa sumber. Hindari status samar 'Belum tersedia dalam materi' ketika informasi ketidakadaan keputusan sudah diberikan secara tegas.
+- ISU DAN ANALISIS: jelaskan masalah redaksional, tujuan kebijakan dan kemungkinan dampak; pisahkan pernyataan eksplisit dari sumber dengan inferensi analis. Jangan menulis 'materi mengasumsikan/menyatakan' bila hal tersebut hanya inferensimu. Standar waktu yang belum menyebut angka/batas waktu baru berupa arah pengaturan, bukan parameter kuantitatif yang sudah ditetapkan.
 - ALTERNATIF REDAKSI: usulan bersyarat, jelas ditandai sebagai contoh, bukan kutipan dari pasal resmi; jangan buat nomor pasal baru. Jika membahas layanan administrasi umum gunakan istilah 'standar pelayanan'. Jika materi TIDAK menyebut Standar Pelayanan Minimal (SPM), jangan menambahkan istilah SPM di draf, termasuk tabel, usulan redaksi, analisis, ataupun dasar hukum; cukup gunakan 'standar pelayanan'. Jika materi secara eksplisit membahas SPM, jelaskan bahwa SPM terkait Pelayanan Dasar, tidak otomatis sama dengan standar pelayanan administrasi umum, dan beri tanda perlu verifikasi. Jangan menggunakan SPM sebagai sinonim standar pelayanan.
-- DASAR HUKUM: wajib [PERLU VERIFIKASI], jangan mengarang nomor/tahun/jenis hukum, dan jangan menyatakan keberlakuan otomatis. Aturan nasional utama berjudul Sistem Pemerintahan Berbasis Elektronik (SPBE) berbentuk Peraturan Presiden, BUKAN Peraturan Pemerintah; jangan menyisipkan nomor/tahun yang tidak disertakan dalam materi.
+- DASAR HUKUM: wajib [PERLU VERIFIKASI], jangan mengarang nomor/tahun/jenis hukum, dan jangan menyatakan keberlakuan otomatis. Sebut hanya KATEGORI hukum paling relevan terhadap substansi materi. Untuk standar waktu pelayanan administrasi, utamakan kategori ketentuan pelayanan publik dan pedoman standar pelayanan, BUKAN otomatis SPBE. Aturan nasional utama berjudul Sistem Pemerintahan Berbasis Elektronik (SPBE) berbentuk Peraturan Presiden, BUKAN Peraturan Pemerintah; sebut SPBE hanya bila materi memang membahas layanan elektronik/digital. Jangan menyisipkan nomor/tahun yang tidak disertakan dalam materi.
 - HAL YANG PERLU DIVERIFIKASI: naskah resmi, kewenangan, harmonisasi, hierarki peraturan, dan kajian hukum pejabat berwenang.`,
   skp:`KHUSUS SKP/RHK:
-- Ikuti delapan judul persis dalam instruksi mode; hasil berupa draf narasi, bukan hasil evaluasi atau penetapan kinerja.
+- Ikuti sembilan judul persis dalam instruksi mode; hasil berupa draf narasi, bukan hasil evaluasi atau penetapan kinerja.
 - STATUS INFORMASI: jelaskan sumber bersifat input pengguna, belum diverifikasi administrasi kepegawaian.
 - TARGET/REALISASI/BUKTI DUKUNG DALAM MATERI: tulis hanya angka, tanggal, bukti dan data eksplisit; jika tidak disebut, tulis 'Belum tersedia dalam materi'.
 - ANALISIS CAPAIAN: jelaskan jumlah yang DILAPORKAN disusun, pekerjaan yang masih DIPROSES, dan apakah status FINAL serta bukti TERVERIFIKASI diketahui. Jangan menganggap 'ditelaah internal' sama dengan 'disahkan/final' kecuali sumber menyatakannya. Jika ada proses belum selesai, tulis status proses dan batas verifikasi secara eksplisit. Jangan menghitung nilai/persentase baru atau mengklaim pencapaian final.
@@ -297,25 +297,38 @@ Ringkas namun utuh (sekitar 350–600 kata jika data memadai). Jangan mengarang 
  };
  const system=baseSystem+'\n'+modeSystem[body.mode];
  try{
-  const response=await env.AI.run(MODEL,{
-   messages:[{role:'system',content:system},{role:'user',content:MODES[body.mode]+'\n\nMATERI YANG DISETUJUI:\n'+body.sourceText}],
-   // Gemma 4 dapat menghabiskan anggaran token untuk thinking. Untuk draf SIPETAK,
-   // minta jawaban langsung agar tidak berhenti sesudah beberapa karakter.
+  // Maksimal dua panggilan model pada satu aksi pengguna: satu utama,
+  // satu perbaikan otomatis hanya jika kualitas awal belum lolos.
+  // Tidak menyimpan atau mengirim draf yang ditolak ke browser.
+  const generate=async(hint='')=>env.AI.run(MODEL,{
+   messages:[
+    {role:'system',content:system+(hint?'\n\nPEMERIKSAAN INTERNAL: Draf pertama belum lolos ('+hint+'). Tulis ulang SELURUH draf dari materi, ringkas, sesuai semua judul wajib, tanpa asumsi sebagai fakta, tanpa dasar hukum rekaan. Jangan tampilkan catatan pemeriksaan internal.':'')},
+    {role:'user',content:MODES[body.mode]+'\n\nMATERI YANG DISETUJUI:\n'+body.sourceText}
+   ],
    chat_template_kwargs:{enable_thinking:false},
    max_completion_tokens:2600,
    temperature:0.2
   });
-  const draft=normalizedResponse(response);
-  const finishReason=String(response?.choices?.[0]?.finish_reason||response?.finish_reason||'').toLowerCase();
-  // Jangan perlakukan hasil terpotong sebagai draf yang berhasil.
-  if(finishReason==='length'||finishReason==='max_tokens'||finishReason==='max_completion_tokens')
-   return json({error:'AI terhenti karena batas panjang jawaban. Coba ulang dengan konteks lebih singkat.',code:'AI_OUTPUT_TRUNCATED'},502,cors);
-  if(!draft||draft.length<160)
-   return json({error:'Respons AI terlalu pendek atau tidak lengkap. Coba ulang. Jika berulang, periksa pengaturan model pada Cloudflare.',code:'AI_OUTPUT_INCOMPLETE'},502,cors);
-  if(draft.length>12000)
-   return json({error:'Respons AI melebihi batas penyimpanan SIPETAK. Coba lagi dengan materi lebih singkat.',code:'AI_OUTPUT_TOO_LONG'},502,cors);
-  const check=checkDraftQuality(draft,body.sourceText,body.mode);
-  if(!check.ok)return json({error:'Draf belum lolos pemeriksaan kualitas otomatis ('+check.code+'). Coba ulang atau perjelas materi. Hasil tidak disimpan.',code:check.code},502,cors);
-  return json({draft:'DRAF AI — WAJIB VERIFIKASI\n\n'+draft,model:MODEL},200,cors);
+  const assess=(response)=>{
+   const draft=normalizedResponse(response);
+   const finishReason=String(response?.choices?.[0]?.finish_reason||response?.finish_reason||'').toLowerCase();
+   if(['length','max_tokens','max_completion_tokens'].includes(finishReason))
+    return {ok:false,code:'AI_OUTPUT_TRUNCATED',error:'AI terhenti karena batas panjang jawaban.'};
+   if(!draft||draft.length<160)
+    return {ok:false,code:'AI_OUTPUT_INCOMPLETE',error:'Respons AI terlalu pendek atau tidak lengkap.'};
+   if(draft.length>12000)
+    return {ok:false,code:'AI_OUTPUT_TOO_LONG',error:'Respons AI melebihi batas penyimpanan SIPETAK.'};
+   const check=checkDraftQuality(draft,body.sourceText,body.mode);
+   if(!check.ok)return {ok:false,code:check.code,error:'Draf belum lolos pemeriksaan kualitas otomatis ('+check.code+').'};
+   return {ok:true,draft};
+  };
+  let result=assess(await generate());
+  if(!result.ok){
+   // Perbaikan sekali saja, agar pengguna tidak perlu menekan tombol berulang.
+   // Biaya pemrosesan AI dapat bertambah hanya pada permintaan yang gagal.
+   result=assess(await generate(result.code));
+  }
+  if(!result.ok)return json({error:result.error+' Periksa atau persingkat materi bila masalah berlanjut. Hasil tidak disimpan.',code:result.code},502,cors);
+  return json({draft:'DRAF AI — WAJIB VERIFIKASI\n\n'+result.draft,model:MODEL},200,cors);
  }catch{return json({error:'Layanan AI sedang tidak dapat memproses. Periksa kuota/billing Workers AI atau coba lagi.'},502,cors)}
  }};
