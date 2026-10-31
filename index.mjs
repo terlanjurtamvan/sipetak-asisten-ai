@@ -2,9 +2,9 @@
  * Never logs request bodies, prompts or model answers. Requires Supabase JWT. */
 const MODES={
  telaahan:'Buat TELAAHAN STAF dengan urutan bagian persis: PERIHAL, POKOK PERSOALAN, STATUS INFORMASI, FAKTA DALAM MATERI, ASUMSI DAN SKENARIO, DASAR HUKUM, ANALISIS, ALTERNATIF, REKOMENDASI, HAL YANG PERLU DIPERIKSA. Jangan menambahkan kop surat atau identitas. Setiap bagian harus terisi singkat dan jelas.',
- persidangan:'Buat DRAF BAHAN RAPAT/RISALAH dengan judul bagian persis dan urut: AGENDA, STATUS INFORMASI, POKOK PEMBAHASAN, KEPUTUSAN YANG TERCATAT, TINDAK LANJUT, HAL YANG PERLU DIKONFIRMASI. Beri label yang tegas jika tidak ada keputusan dalam materi. Jangan mengarang peserta, kutipan, kesepakatan, jadwal, keputusan, atau hasil voting.',
- dim:'Buat DRAF ANALISIS DIM/RAPERDA dengan judul bagian persis dan urut: OBJEK PEMBAHASAN, STATUS INFORMASI, RUMUSAN DALAM MATERI, ISU DAN ANALISIS, ALTERNATIF REDAKSI, IMPLIKASI DAN RISIKO, DASAR HUKUM, HAL YANG PERLU DIVERIFIKASI. Tidak boleh membuat pasal, rumusan atau ketentuan baru seolah-olah berasal dari dokumen resmi.',
- skp:'Buat DRAF NARASI SKP/RHK dengan judul bagian persis dan urut: PERIODE DAN OBJEK KINERJA, STATUS INFORMASI, TARGET DALAM MATERI, REALISASI DALAM MATERI, BUKTI DUKUNG DALAM MATERI, ANALISIS CAPAIAN, DRAF NARASI KINERJA, HAL YANG PERLU DIVERIFIKASI. Jangan mengarang angka, persentase, bukti, penilaian, persetujuan atasan, atau status realisasi resmi.',
+ persidangan:'Buat DRAF BAHAN RAPAT/RISALAH dengan judul bagian persis dan urut: AGENDA, STATUS INFORMASI, POKOK PEMBAHASAN, KEPUTUSAN YANG TERCATAT, TINDAK LANJUT, HAL YANG PERLU DIKONFIRMASI. Dalam TINDAK LANJUT wajib ada dua sublabel: Penugasan yang tercatat: dan Saran tindak lanjut (bukan keputusan rapat):. Berikan saran analitis yang proporsional jika ada pembahasan, tanpa menyebutnya keputusan. Jika tidak ada keputusan, nyatakan belum tersedia. Jangan mengarang peserta, kutipan, kesepakatan, jadwal, keputusan, atau hasil voting.',
+ dim:'Buat DRAF ANALISIS DIM/RAPERDA dengan judul bagian persis dan urut: OBJEK PEMBAHASAN, STATUS INFORMASI, RUMUSAN DALAM MATERI, ISU DAN ANALISIS, ALTERNATIF REDAKSI, IMPLIKASI DAN RISIKO, DASAR HUKUM, HAL YANG PERLU DIVERIFIKASI. Dalam RUMUSAN DALAM MATERI wajib ada tabel Markdown 5 kolom: Rumusan awal | Usulan perubahan | Isu/analisis | Rekomendasi | Status, dengan baris pembatas dan setidaknya satu baris data. Jika input belum memiliki rumusan, isikan Belum tersedia dalam materi; jangan mengarang. Tidak boleh membuat pasal, rumusan atau ketentuan baru seolah-olah berasal dari dokumen resmi.',
+ skp:'Buat DRAF NARASI SKP/RHK dengan judul bagian persis dan urut: PERIODE DAN OBJEK KINERJA, STATUS INFORMASI, TARGET DALAM MATERI, REALISASI DALAM MATERI, BUKTI DUKUNG DALAM MATERI, ANALISIS CAPAIAN, DRAF NARASI KINERJA, TINDAK LANJUT YANG DISARANKAN, HAL YANG PERLU DIVERIFIKASI. Bedakan pekerjaan dilaporkan disusun, masih diproses, selesai/final (jika benar-benar didukung), dan bukti terverifikasi. TINDAK LANJUT berisi langkah usulan, bukan keputusan kepegawaian. Jika periode spesifik tidak tersedia gunakan [PERIODE BELUM DIISI]. Jangan mengarang angka, persentase, bukti, penilaian, persetujuan atasan, atau status realisasi resmi.',
  harian:'Buat prioritas kerja harian berdasarkan tenggat, urgensi, risiko, dan tindakan konkret. Semua arahan adalah saran, bukan disposisi sah.'
 };
 const MODEL='@cf/google/gemma-4-26b-a4b-it';
@@ -52,7 +52,7 @@ const BAGIAN_PER_MODE={
  telaahan:['PERIHAL','POKOK PERSOALAN','STATUS INFORMASI','FAKTA DALAM MATERI','ASUMSI DAN SKENARIO','DASAR HUKUM','ANALISIS','ALTERNATIF','REKOMENDASI','HAL YANG PERLU DIPERIKSA'],
  persidangan:['AGENDA','STATUS INFORMASI','POKOK PEMBAHASAN','KEPUTUSAN YANG TERCATAT','TINDAK LANJUT','HAL YANG PERLU DIKONFIRMASI'],
  dim:['OBJEK PEMBAHASAN','STATUS INFORMASI','RUMUSAN DALAM MATERI','ISU DAN ANALISIS','ALTERNATIF REDAKSI','IMPLIKASI DAN RISIKO','DASAR HUKUM','HAL YANG PERLU DIVERIFIKASI'],
- skp:['PERIODE DAN OBJEK KINERJA','STATUS INFORMASI','TARGET DALAM MATERI','REALISASI DALAM MATERI','BUKTI DUKUNG DALAM MATERI','ANALISIS CAPAIAN','DRAF NARASI KINERJA','HAL YANG PERLU DIVERIFIKASI']
+ skp:['PERIODE DAN OBJEK KINERJA','STATUS INFORMASI','TARGET DALAM MATERI','REALISASI DALAM MATERI','BUKTI DUKUNG DALAM MATERI','ANALISIS CAPAIAN','DRAF NARASI KINERJA','TINDAK LANJUT YANG DISARANKAN','HAL YANG PERLU DIVERIFIKASI']
 };
 const TELAAHAN_BAGIAN=BAGIAN_PER_MODE.telaahan;
 function cleanHeading(line){
@@ -116,6 +116,56 @@ function checkLawSection(sections){
  }
  return {ok:true};
 }
+// Tahap 4.1: Pemeriksaan bentuk DIM. Tabel hanyalah tampilan; ini bukan validasi
+// keabsahan rumusan Raperda atau kesesuaian dengan naskah hukum.
+function checkDimTable(sections){
+ const lines=sections.get('RUMUSAN DALAM MATERI')||[];
+ const rows=lines.filter(line=>/^\s*\|.*\|\s*$/.test(line)).map(line=>line.trim().slice(1,-1).split('|').map(cell=>cell.trim()));
+ const expected=['rumusan awal','usulan perubahan','isu/analisis','rekomendasi','status'];
+ if(rows.length<3||rows[0].length!==5||!expected.every((name,i)=>rows[0][i].toLocaleLowerCase('id-ID')===name))
+  return {ok:false,code:'AI_DIM_TABLE_FORMAT'};
+ if(rows[1].length!==5||!rows[1].every(cell=>/^:?-{3,}:?$/.test(cell)))
+  return {ok:false,code:'AI_DIM_TABLE_FORMAT'};
+ if(!rows.slice(2).some(row=>row.length===5&&row.every(cell=>cell.length>2&&!/^[-–—]+$/.test(cell))))
+  return {ok:false,code:'AI_DIM_TABLE_FORMAT'};
+ return {ok:true};
+}
+function checkMeetingFollowup(sections,sourceText){
+ const part=sections.get('TINDAK LANJUT').join('\n');
+ const assignment=/(?:^|\n)\s*(?:[-*]\s*)?penugasan\s+yang\s+tercatat\s*:/i;
+ const suggestion=/(?:^|\n)\s*(?:[-*]\s*)?saran\s+tindak\s+lanjut\s*\(bukan keputusan rapat\)\s*:/i;
+ if(!assignment.test(part)||!suggestion.test(part))return {ok:false,code:'AI_MEETING_FOLLOWUP_FORMAT'};
+ const proposal=part.split(suggestion).at(-1).trim();
+ if(!proposal||(/^(?:belum\s+(?:ada|tersedia|diketahui)(?:\s+dalam\s+materi)?)[.\s]*$/i.test(proposal)&&sourceText.trim().length>80))
+  return {ok:false,code:'AI_MEETING_FOLLOWUP_EMPTY'};
+ return {ok:true};
+}
+function checkSkpFollowup(sections,sourceText){
+ const followup=sections.get('TINDAK LANJUT YANG DISARANKAN').join(' ').trim();
+ if(followup.length<35||/^belum\s+(?:ada|tersedia)(?:\s+dalam\s+materi)?[.\s]*$/i.test(followup))
+  return {ok:false,code:'AI_SKP_FOLLOWUP_EMPTY'};
+ const analysis=sections.get('ANALISIS CAPAIAN').join(' ');
+ if(/\b(?:penyempurnaan|masih\s+(?:dalam\s+)?proses|belum\s+selesai)\b/i.test(sourceText)&&
+    (!/\b(?:proses|penyempurnaan|belum\s+selesai)\b/i.test(analysis)||! /\b(?:final|verifikasi|bukti|selesai)\b/i.test(analysis)))
+  return {ok:false,code:'AI_SKP_STATUS_UNCLEAR'};
+ const narrative=sections.get('DRAF NARASI KINERJA').join(' ');
+ if(/\b(?:dalam|selama)\s+periode\s+ini\b/i.test(narrative))
+  return {ok:false,code:'AI_SKP_PERIOD_IMPLIED'};
+ return {ok:true};
+}
+function checkDimServiceTerms(sections,sourceText){
+ // SPM adalah istilah regulatif spesifik, bukan sinonim otomatis standar pelayanan.
+ // Izinkan pembedaan eksplisit; jangan otomatis menyisipkan acuan/nomor hukumnya.
+ if(/\b(?:standar pelayanan minimal|SPM)\b/i.test(sourceText))return {ok:true};
+ const text=[...sections.values()].flat().join(' ');
+ if(!/\b(?:standar pelayanan minimal|SPM)\b/i.test(text))return {ok:true};
+ const sentences=text.split(/[.\n;]/);
+ for(const sentence of sentences){
+  if(/\b(?:standar pelayanan minimal|SPM)\b/i.test(sentence)&&! /\b(?:bukan|berbeda|tidak\s+sama|jangan\s+disamakan|perlu\s+dibedakan)\b/i.test(sentence))
+   return {ok:false,code:'AI_DIM_SPM_CONFUSION'};
+ }
+ return {ok:true};
+}
 function checkDraftQuality(draft,sourceText,mode){
  if(!Object.hasOwn(BAGIAN_PER_MODE,mode))return {ok:true}; // mode harian tetap seperti Tahap 3
  const structure=checkSections(draft,mode);
@@ -130,13 +180,19 @@ function checkDraftQuality(draft,sourceText,mode){
   if(!law.ok)return law;
  }
  if(mode==='persidangan'){
+  const followup=checkMeetingFollowup(sections,sourceText);if(!followup.ok)return followup;
   // Tanpa keputusan eksplisit dalam sumber, bagian keputusan harus menyatakan
   // bahwa keputusan belum tercatat; larangan ini bukan verifikasi risalah resmi.
   const sourceDecision=/(?:\b(?:memutuskan|diputuskan|disepakati|menyetujui|menetapkan|hasil\s+voting)\b|\bkeputusan\s*:)/i.test(sourceText);
   const declaredUnknown=/\b(?:belum\s+(?:ada|tersedia|tercatat|diketahui|diputuskan)|tidak\s+(?:ada|tersedia|terdapat|disebut(?:kan)?|tercatat|tercantum))\b/i.test(sections.get('KEPUTUSAN YANG TERCATAT').join(' '));
   if(!sourceDecision&&!declaredUnknown)return {ok:false,code:'AI_MEETING_UNSUPPORTED_DECISION'};
  }
+ if(mode==='dim'){
+  const table=checkDimTable(sections);if(!table.ok)return table;
+  const spm=checkDimServiceTerms(sections,sourceText);if(!spm.ok)return spm;
+ }
  if(mode==='skp'){
+  const followup=checkSkpFollowup(sections,sourceText);if(!followup.ok)return followup;
   // Tolak angka persentase baru; sumber tetap belum berarti realisasi sudah sah.
   const percent=x=>new Set([...String(x).matchAll(/\b(\d{1,3}(?:[.,]\d+)?)\s*%/g)].map(m=>m[1].replace(',','.')));
   const provided=percent(sourceText);
@@ -154,7 +210,7 @@ export default {async fetch(request,env){
   let supabaseReady=false;try{supabaseConfig(env);supabaseReady=true}catch{}
   const checks={aiBinding:Boolean(env.AI),rateLimit:Boolean(env.AI_RATE_LIMIT),supabasePublicConfig:supabaseReady,allowedOrigin:Boolean(permitted)};
   // Membolehkan frontend SIPETAK membaca /health; tanpa bearer, teks pekerjaan, atau data akun.
-  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.8-ai-multimode-quality'},200,cors);
+  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.9-ai-multimode-refinement'},200,cors);
  }
  if(path!=='/assist')return json({error:'Tidak ditemukan.'},404,cors);
  if(!permitted||!cors)return json({error:'Origin tidak diizinkan.'},403);
@@ -200,23 +256,24 @@ Ringkas namun utuh (sekitar 350–600 kata jika data memadai). Jangan mengarang 
 - STATUS INFORMASI: nyatakan apakah input hanya simulasi, ringkasan pengguna, atau catatan yang belum diverifikasi.
 - POKOK PEMBAHASAN: pisahkan topik, pendapat yang secara eksplisit ada di materi dan pertanyaan terbuka. Jangan mengarang peserta/kutipan.
 - KEPUTUSAN YANG TERCATAT: hanya keputusan yang eksplisit ada pada materi; jika tidak ada, wajib tulis 'Belum tersedia dalam materi', bukan menyimpulkan rapat menyetujui hal tertentu.
-- TINDAK LANJUT: pisahkan penugasan yang tercatat dengan saran tindak lanjut; jangan menetapkan penanggung jawab/tenggat yang tidak ada.
+- TINDAK LANJUT wajib memuat dua baris berlabel persis: 'Penugasan yang tercatat:' dan 'Saran tindak lanjut (bukan keputusan rapat):'. Pada penugasan tulis yang benar-benar tercatat atau 'Belum tersedia dalam materi'. Pada saran berikan 1–3 langkah analitis yang mungkin dilakukan dari pokok pembahasan (misalnya inventarisasi/konfirmasi), TANPA menganggap sebagai keputusan rapat atau menetapkan penanggung jawab/tenggat. Bila materi tidak mengandung pembahasan cukup, sarankan memeriksa bahan rapat terlebih dahulu.
 - HAL YANG PERLU DIKONFIRMASI: agenda, peserta, pendapat, quorum, keputusan, tanggal, dan keabsahan catatan jika belum tersedia.
 - Jangan menyatakan dokumen resmi telah ditandatangani/disahkan.`,
   dim:`KHUSUS DIM/RAPERDA:
 - Ikuti delapan judul persis dalam instruksi mode; ini analisis konseptual, bukan DIM final atau pendapat hukum definitif.
 - STATUS INFORMASI: nyatakan simulasi/klaim, dan bahwa teks belum diverifikasi pada naskah Raperda resmi.
-- RUMUSAN DALAM MATERI: kutip/ikhtisarkan hanya rumusan atau pasal yang benar-benar diberikan. Jika tidak ada teks pasal, tulis 'Belum tersedia dalam materi'.
+- RUMUSAN DALAM MATERI: buat TABEL MARKDOWN ringkas 5 kolom dengan header PERSIS '| Rumusan awal | Usulan perubahan | Isu/analisis | Rekomendasi | Status |', lalu baris '| --- | --- | --- | --- | --- |' dan minimal satu baris data '| ... | ... | ... | ... | ... |'. Hanya rumusan yang benar-benar ada dalam materi boleh dikutip sebagai rumusan sumber; jika tidak ada, isi 'Belum tersedia dalam materi' dan tandai usulan hanya sebagai konsep. Kolom Status tidak boleh mengklaim 'disetujui/disahkan' jika materi tidak memuatnya.
 - ISU DAN ANALISIS: jelaskan potensi masalah redaksional, tujuan kebijakan dan akibat, bedakan asumsi dengan fakta sumber.
-- ALTERNATIF REDAKSI: usulan bersyarat, jelas ditandai sebagai contoh, bukan kutipan dari pasal resmi; jangan buat nomor pasal baru.
+- ALTERNATIF REDAKSI: usulan bersyarat, jelas ditandai sebagai contoh, bukan kutipan dari pasal resmi; jangan buat nomor pasal baru. Jika membahas layanan administrasi umum gunakan istilah 'standar pelayanan'. Jangan mengganti dengan 'standar pelayanan minimal (SPM)': SPM khusus Pelayanan Dasar, tidak otomatis sama dengan standar pelayanan publik. Jika materi memakai SPM, jelaskan perbedaannya dan beri tanda perlu verifikasi.
 - DASAR HUKUM: wajib [PERLU VERIFIKASI], jangan mengarang nomor/tahun/jenis hukum, dan jangan menyatakan keberlakuan otomatis. Aturan nasional utama berjudul Sistem Pemerintahan Berbasis Elektronik (SPBE) berbentuk Peraturan Presiden, BUKAN Peraturan Pemerintah; jangan menyisipkan nomor/tahun yang tidak disertakan dalam materi.
 - HAL YANG PERLU DIVERIFIKASI: naskah resmi, kewenangan, harmonisasi, hierarki peraturan, dan kajian hukum pejabat berwenang.`,
   skp:`KHUSUS SKP/RHK:
 - Ikuti delapan judul persis dalam instruksi mode; hasil berupa draf narasi, bukan hasil evaluasi atau penetapan kinerja.
 - STATUS INFORMASI: jelaskan sumber bersifat input pengguna, belum diverifikasi administrasi kepegawaian.
 - TARGET/REALISASI/BUKTI DUKUNG DALAM MATERI: tulis hanya angka, tanggal, bukti dan data eksplisit; jika tidak disebut, tulis 'Belum tersedia dalam materi'.
-- ANALISIS CAPAIAN: jelaskan keterbatasan data. Jangan menghitung nilai/persentase baru atau mengklaim pencapaian final.
-- DRAF NARASI KINERJA: ringkaskan kegiatan dan kontribusi yang ada di materi, pakai bahasa bersyarat jika ada data kurang.
+- ANALISIS CAPAIAN: jelaskan jumlah yang DILAPORKAN disusun, pekerjaan yang masih DIPROSES, dan apakah status FINAL serta bukti TERVERIFIKASI diketahui. Jangan menganggap 'ditelaah internal' sama dengan 'disahkan/final' kecuali sumber menyatakannya. Jika ada proses belum selesai, tulis status proses dan batas verifikasi secara eksplisit. Jangan menghitung nilai/persentase baru atau mengklaim pencapaian final.
+- DRAF NARASI KINERJA: ringkaskan kegiatan dan kontribusi yang ada di materi, pakai bahasa bersyarat jika ada data kurang. Jika waktu belum spesifik, jangan menulis 'dalam periode ini'; nyatakan [PERIODE BELUM DIISI] jika perlu.
+- TINDAK LANJUT YANG DISARANKAN: wajib isi 2–4 langkah konkret dan bersyarat, seperti memverifikasi bukti, menyelesaikan draf yang masih diproses, atau mengonfirmasi target/indikator. Ini saran, BUKAN penugasan atasan atau penilaian SKP resmi.
 - HAL YANG PERLU DIVERIFIKASI: cek bukti, indikator, periode, target, persetujuan dan penilaian pejabat yang berwenang.
 - Jangan menganggap draf statistik sebagai realisasi resmi atau memalsukan bukti.`,
   harian:`KHUSUS PRIORITAS HARIAN: hanya saran untuk pengguna. Jangan membuat disposisi, keputusan, tanggal tenggat, atau penugasan resmi yang tidak terdapat dalam materi.`
