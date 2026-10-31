@@ -54,7 +54,8 @@ export default {async fetch(request,env){
  if(path==='/health'&&request.method==='GET'){
   let supabaseReady=false;try{supabaseConfig(env);supabaseReady=true}catch{}
   const checks={aiBinding:Boolean(env.AI),rateLimit:Boolean(env.AI_RATE_LIMIT),supabasePublicConfig:supabaseReady,allowedOrigin:Boolean(permitted)};
-  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.3'});
+  // Membolehkan frontend SIPETAK membaca /health; tanpa bearer, teks pekerjaan, atau data akun.
+  return json({service:'sipetak-asisten-ai',configured:Object.values(checks).every(Boolean),checks,version:'3.8.5-ai-health'},200,cors);
  }
  if(path!=='/assist')return json({error:'Tidak ditemukan.'},404,cors);
  if(!permitted||!cors)return json({error:'Origin tidak diizinkan.'},403);
